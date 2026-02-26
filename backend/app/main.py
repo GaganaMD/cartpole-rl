@@ -3,8 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import torch
 import gymnasium as gym
 import time
-import sqlite3
-from pathlib import Path
 
 from .model import model, Policy
 
@@ -30,40 +28,6 @@ def _inc():
     request_count += 1
 
 
-# --- SQLite setup ---
-DB_PATH = Path(__file__).parent / "episodes.db"
-
-
-def get_conn():
-    # sqlite3 is lightweight; a new connection per request is fine here.
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init_db():
-    conn = get_conn()
-    try:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS episodes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ts REAL NOT NULL,
-                total_reward REAL NOT NULL,
-                steps INTEGER NOT NULL
-            )
-            """
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
-
-
 @app.get("/")
 async def root():
     _inc()
@@ -85,10 +49,14 @@ async def act(state: list = Body(...)):
 
 
 @app.post("/simulate")
-async def simulate(steps: int = 500):
+async def simulate(steps: int = 500, policy: str = "trained"):
     """
-    Run one episode with the current policy, return rewards per step
-    and episode summary. Also log the episode to SQLite.
+    Run one episode with the requested policy ("trained" or "random"),
+    return rewards per step and episode summary.
+
+    Query params:
+      - steps:  max number of steps to run
+      - policy: "trained" (default) or "random"
     """
     _inc()
     obs, info = env.reset()
@@ -96,10 +64,15 @@ async def simulate(steps: int = 500):
     states = []
 
     for _ in range(steps):
-        state_t = torch.FloatTensor([obs])
-        logits = model(state_t)
-        probs = torch.softmax(logits, dim=1)
-        action = torch.argmax(probs, dim=1).item()
+        if policy == "random":
+            # ignore the model, sample a random action from the env
+            action = env.action_space.sample()
+        else:
+            # default: use the trained PPO policy
+            state_t = torch.FloatTensor([obs])
+            logits = model(state_t)
+            probs = torch.softmax(logits, dim=1)
+            action = torch.argmax(probs, dim=1).item()
 
         obs, rew, done, trunc, info = env.step(action)
         rewards.append(float(rew))
@@ -109,58 +82,13 @@ async def simulate(steps: int = 500):
             break
 
     total_reward = float(sum(rewards))
-    n_steps = len(rewards)
-
-    # log to DB
-    conn = get_conn()
-    try:
-        conn.execute(
-            "INSERT INTO episodes (ts, total_reward, steps) VALUES (?, ?, ?)",
-            (time.time(), total_reward, n_steps),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
     return {
+        "policy": policy,
         "total_reward": total_reward,
         "rewards": rewards,
-        "steps": n_steps,
+        "steps": len(rewards),
         "last_state": states[-1] if states else None,
     }
-
-
-@app.get("/episodes/recent")
-async def recent_episodes(limit: int = 20):
-    """
-    Return the most recent episodes, newest first.
-    """
-    _inc()
-    conn = get_conn()
-    try:
-        cur = conn.execute(
-            """
-            SELECT id, ts, total_reward, steps
-            FROM episodes
-            ORDER BY ts DESC
-            LIMIT ?
-            """,
-            (limit,),
-        )
-        rows = cur.fetchall()
-    finally:
-        conn.close()
-
-    episodes = [
-        {
-            "id": row["id"],
-            "timestamp": row["ts"],
-            "total_reward": row["total_reward"],
-            "steps": row["steps"],
-        }
-        for row in rows
-    ]
-    return {"episodes": episodes}
 
 
 @app.get("/health")
