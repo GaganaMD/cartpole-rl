@@ -24,6 +24,14 @@ Train a PPO agent, serve it behind an API, and explore its behavior in a web UI.
   * Probe the policy with manual state sliders
   * Run full episodes and visualize rewards over time
 * ✅ Fully Dockerized frontend + backend with `docker-compose` for one-command startup
+* ✅ Random vs trained policy
+   The app lets you compare the trained PPO agent against a random baseline:
+
+   - In the Streamlit UI, choose **trained** or **random** in the *Policy to use* radio.
+   - The backend `/simulate` endpoint accepts a `policy` query parameter (`"trained"` or `"random"`).
+   - Episodes with the trained policy typically achieve high total reward (long survival),
+     while the random policy fails quickly, making the benefit of learning clearly visible.
+
 
 > This project is an end-to-end RL deployment example and a strong foundation for adding production-grade MLOps components such as logging, monitoring, CI/CD, and experiment tracking.
 
