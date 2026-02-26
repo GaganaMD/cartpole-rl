@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+venv/
+.venv/
+*.log
+
+# Data and models (keep ppo.pth if you want, or ignore)
+data/
+#backend/app/ppo.pth
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+# Python cache
+*.pyo
+*.pyd
+
+# Docker
+*.pid

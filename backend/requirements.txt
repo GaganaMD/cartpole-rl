@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+torch
+gymnasium[classic_control]
+pillow
+numpy
