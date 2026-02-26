@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import torch
 import gymnasium as gym
 import time
+import sqlite3
+from pathlib import Path
 
 from .model import model, Policy
 
@@ -26,6 +28,40 @@ request_count = 0
 def _inc():
     global request_count
     request_count += 1
+
+
+# --- SQLite setup ---
+DB_PATH = Path(__file__).parent / "episodes.db"
+
+
+def get_conn():
+    # sqlite3 is lightweight; a new connection per request is fine here.
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = get_conn()
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS episodes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts REAL NOT NULL,
+                total_reward REAL NOT NULL,
+                steps INTEGER NOT NULL
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
 
 
 @app.get("/")
@@ -52,7 +88,7 @@ async def act(state: list = Body(...)):
 async def simulate(steps: int = 500):
     """
     Run one episode with the current policy, return rewards per step
-    and episode summary.
+    and episode summary. Also log the episode to SQLite.
     """
     _inc()
     obs, info = env.reset()
@@ -73,12 +109,58 @@ async def simulate(steps: int = 500):
             break
 
     total_reward = float(sum(rewards))
+    n_steps = len(rewards)
+
+    # log to DB
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO episodes (ts, total_reward, steps) VALUES (?, ?, ?)",
+            (time.time(), total_reward, n_steps),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
     return {
         "total_reward": total_reward,
         "rewards": rewards,
-        "steps": len(rewards),
+        "steps": n_steps,
         "last_state": states[-1] if states else None,
     }
+
+
+@app.get("/episodes/recent")
+async def recent_episodes(limit: int = 20):
+    """
+    Return the most recent episodes, newest first.
+    """
+    _inc()
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            """
+            SELECT id, ts, total_reward, steps
+            FROM episodes
+            ORDER BY ts DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    episodes = [
+        {
+            "id": row["id"],
+            "timestamp": row["ts"],
+            "total_reward": row["total_reward"],
+            "steps": row["steps"],
+        }
+        for row in rows
+    ]
+    return {"episodes": episodes}
 
 
 @app.get("/health")
