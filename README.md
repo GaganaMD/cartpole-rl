@@ -1,7 +1,7 @@
 # 🎯 CartPole RL – End-to-End Deployed PPO Agent
 
+![CI](https://github.com/GaganaMD/cartpole-rl/actions/workflows/ci.yml/badge.svg?branch=main)
 
-[![CI](https://github.com/GaganaMD/cartpole-rl/actions/workflows/ci.yml/badge.svg)](https://github.com/GaganaMD/cartpole-rl/actions/workflows/ci.yml)
 
 
 Interactive CartPole demo built with **PyTorch**, **FastAPI**, **Streamlit**, and **Docker**.
