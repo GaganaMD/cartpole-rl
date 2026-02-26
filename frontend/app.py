@@ -1,14 +1,18 @@
 import streamlit as st
 import requests
 import numpy as np
+import matplotlib.pyplot as plt
 
-API_URL = "http://127.0.0.1:8000"
+#API_URL = "http://127.0.0.1:8000"  # change to "http://backend:8000" when inside Docker compose
+
+API_URL = "http://backend:8000"  # when using docker-compose
+
 
 st.title("CartPole RL Agent (FastAPI + PyTorch)")
+st.markdown("Interact with a trained CartPole policy served via FastAPI.")
 
-st.markdown("Send a CartPole state to the RL policy and get the chosen action + probabilities.")
+st.subheader("Query action for a single state")
 
-# Manual state sliders
 cart_pos = st.slider("Cart Position", -2.4, 2.4, 0.0, 0.01)
 cart_vel = st.slider("Cart Velocity", -3.0, 3.0, 0.0, 0.01)
 pole_angle = st.slider("Pole Angle", -0.2, 0.2, 0.0, 0.01)
@@ -26,4 +30,27 @@ if st.button("Query Agent"):
     except Exception as e:
         st.error(f"Error talking to backend: {e}")
 
-st.caption("Backend: FastAPI @ /act • Model: PyTorch policy trained on CartPole-v1")
+st.markdown("---")
+st.subheader("Run one full episode")
+
+if st.button("Run Episode with current policy"):
+    try:
+        resp = requests.post(f"{API_URL}/simulate", json={}, timeout=15)
+        data = resp.json()
+        rewards = data.get("rewards", [])
+        total_reward = data.get("total_reward", 0.0)
+        steps = data.get("steps", 0)
+
+        st.write(f"Total reward: {total_reward:.1f} over {steps} steps")
+
+        if rewards:
+            fig, ax = plt.subplots()
+            ax.plot(rewards)
+            ax.set_xlabel("Step")
+            ax.set_ylabel("Reward")
+            ax.set_title("Per-step reward")
+            st.pyplot(fig)
+    except Exception as e:
+        st.error(f"Error running episode: {e}")
+
+st.caption("Backend: FastAPI • Model: PyTorch policy trained on CartPole-v1 • Frontend: Streamlit")
