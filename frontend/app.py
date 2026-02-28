@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 
 #API_URL = "http://127.0.0.1:8000"  # change to "http://backend:8000" when inside Docker compose
 
-API_URL = "http://127.0.0.1:8000" 
+API_URL = "https://cartpole-rl.onrender.com"
+
 
 
 st.title("CartPole RL Agent (FastAPI + PyTorch)")
