@@ -8,6 +8,11 @@ Interactive CartPole demo built with **PyTorch**, **FastAPI**, **Streamlit**, an
 
 Train a PPO agent, serve it behind an API, and explore its behavior in a web UI.
 
+🟢 Live demo: https://cartpole-rl-frontend.onrender.com
+
+Backend API: https://cartpole-rl.onrender.com/docs
+
+
 ---
 
 ## 🚀 Features
